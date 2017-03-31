@@ -10,7 +10,7 @@
   :source-paths ["src"]
   :plugins [[lein-environ "1.1.0"]
             [lein-pprint "1.1.1"]]
-  :main ^:skip-aot wb-es-indexer.core
+  :main ^:skip-aot wb-es-indexer.db
   :resource-paths ["resources"]
   :uberjar {:aot :all}
   :target-path "target/%s"
