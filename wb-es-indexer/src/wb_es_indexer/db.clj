@@ -71,16 +71,6 @@
    "variation"
    "wbprocess"])
 
-(defn get-reverse-ref-attrs [db type-name]
-  (let [idents
-        (d/q '[:find [?ident ...]
-               :in $ ?ref-ident
-               :where
-               [?e :pace/obj-ref ?ref-ident]
-               [?e :db/ident ?ident]
-               [_ :db.install/attribute ?e]]
-             db (keyword type-name "id"))]
-    idents))
 
 (defn is-ns-attr [db attr]
   (d/q '[:find [?ident ...]
@@ -118,13 +108,14 @@
 
 ;; End datomic schema queries
 
-(defn- remove-from-pull-spec [pull-spec attr]
-  (->> pull-spec
-       (filter (fn [spec-pattern]
-                 (and (not= spec-pattern attr)
-                      (or (not (map? spec-pattern))
-                          (not (contains? spec-pattern attr))))))
-       (apply vector)))
+(defn- remove-from-pull-spec [attrs pull-spec]
+  (let [attrs-set (set attrs)]
+    (->> pull-spec
+         (filter (fn [spec-pattern]
+                   (and (not (attrs-set spec-pattern))
+                        (or (not (map? spec-pattern))
+                            (not (attrs-set (first (keys spec-pattern))))))))
+         (apply vector))))
 
 
 ;;
@@ -141,7 +132,8 @@
           ;; component ref
           [{attr (->> c-attrs
                       (map #(forward-pull-spec db %))
-                      (reduce concat []))}]
+                      (reduce concat [])
+                      (apply vector))}]
           []))
       [attr])))
 
@@ -153,4 +145,47 @@
       [{(reverse-attr attr) [(keyword (namespace attr) "id")]}])))
 ;;
 ;; end of pull spec parts
+;;
+
+
+;;
+;; pull from a generic type
+;;
+
+(defn get-reverse-ref-attrs [db type-name]
+  (let [idents
+        (d/q '[:find [?ident ...]
+               :in $ ?ref-ident
+               :where
+               [?e :pace/obj-ref ?ref-ident]
+               [?e :db/ident ?ident]
+               [_ :db.install/attribute ?e]]
+             db (keyword type-name "id"))]
+    idents))
+
+(defn get-attrs-by-type [db type-name]
+  (d/q '[:find [?ident ...]
+         :in $ ?ns
+         :where
+         [?e :db/ident ?ident]
+         [(namespace ?ident) ?ns]
+         [_ :db.install/attribute ?e]]
+       db type-name))
+
+(defn pull-spec
+  ([db type-name]
+   (pull-spec db type-name []))
+  ([db type-name skip-attrs]
+   (let [forward-attrs (get-attrs-by-type db type-name)]
+     (->> (reduce (fn [accumulator attr]
+                    (concat accumulator (forward-pull-spec db attr)))
+                  []
+                  forward-attrs)
+          (remove-from-pull-spec skip-attrs)))))
+
+;; example
+;; (d/pull db (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/other-sequence]) [:gene/id "WBGene00015146"])
+
+;;
+;; end pull from a generic type
 ;;
