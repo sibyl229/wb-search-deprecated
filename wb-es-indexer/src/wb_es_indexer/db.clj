@@ -39,37 +39,38 @@
 ;;                    [_ :pace/use-ns ?ns])]
 ;;        db "id"))
 (def core-type-names
-  ["analysis"
-   "antibody"
-   "cds"
-   "clone"
-   "construct"
-   "disease"
-   "feature"
-   "gene"
-   "gene-class"
-   "go-term"
-   "laboratory"
-   "life-stage"
-   "molecule"
-   "motif"
-   "operon"
-   "paper"
-   "pcr-oligo"
-   "person"
-   "phenotype"
-   "picture"
-   "protein"
-   "pseudogene"
-   "rnai"
-   "sequence"
-   "species"
-   "strain"
-   "transcript"
-   "transgene"
-   "transposon"
-   "variation"
-   "wbprocess"])
+  #{"analysis"
+    "antibody"
+    "cds"
+    "clone"
+    "construct"
+    "disease"
+    "expr-pattern"
+    "feature"
+    "gene"
+    "gene-class"
+    "go-term"
+    "laboratory"
+    "life-stage"
+    "molecule"
+    "motif"
+    "operon"
+    "paper"
+    "pcr-oligo"
+    "person"
+    "phenotype"
+    "picture"
+    "protein"
+    "pseudogene"
+    "rnai"
+    "sequence"
+    "species"
+    "strain"
+    "transcript"
+    "transgene"
+    "transposon"
+    "variation"
+    "wbprocess"})
 
 
 (defn is-ns-attr [db attr]
@@ -140,9 +141,15 @@
 (defn reverse-pull-spec [db attr]
   (let [attr-entity (d/entity db [:db/ident attr])]
     (if-let [parent-attr (component-attr-of db attr)]
-      [{(reverse-attr attr) [{(reverse-attr parent-attr)
-                              [(keyword (namespace parent-attr) "id")]}]}]
-      [{(reverse-attr attr) [(keyword (namespace attr) "id")]}])))
+      (let [parent-ident (keyword (namespace parent-attr) "id")]
+        (if (core-type-names (namespace parent-ident))
+          [{(reverse-attr attr) [{(reverse-attr parent-attr)
+                                  [parent-ident]}]}]
+          []))
+      (let [other-ident (keyword (namespace attr) "id")]
+        (if (core-type-names other-ident)
+          [{(reverse-attr attr) [other-ident]}]
+          [])))))
 ;;
 ;; end of pull spec parts
 ;;
@@ -152,7 +159,7 @@
 ;; pull from a generic type
 ;;
 
-(defn get-reverse-ref-attrs [db type-name]
+(defn get-reverse-attrs [db type-name]
   (let [idents
         (d/q '[:find [?ident ...]
                :in $ ?ref-ident
@@ -176,12 +183,17 @@
   ([db type-name]
    (pull-spec db type-name []))
   ([db type-name skip-attrs]
-   (let [forward-attrs (get-attrs-by-type db type-name)]
-     (->> (reduce (fn [accumulator attr]
-                    (concat accumulator (forward-pull-spec db attr)))
-                  []
-                  forward-attrs)
-          (remove-from-pull-spec skip-attrs)))))
+   (let [forward-attrs (get-attrs-by-type db type-name)
+         reverse-attrs (get-reverse-attrs db type-name)]
+     (into [] (concat (->> (reduce (fn [accumulator attr]
+                                     (concat accumulator (forward-pull-spec db attr)))
+                                   []
+                                   forward-attrs)
+                           (remove-from-pull-spec skip-attrs))
+                      (->> (reduce (fn [accumulator attr]
+                                     (concat accumulator (reverse-pull-spec db attr)))
+                                   []
+                                   reverse-attrs)))))))
 
 ;; example
 ;; (d/pull db (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/other-sequence]) [:gene/id "WBGene00015146"])
