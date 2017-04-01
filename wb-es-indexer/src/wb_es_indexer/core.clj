@@ -27,15 +27,14 @@
         body (:doc doc)]
     (str (json/generate-string action)
          "\n"
-         (json/generate-string body))))
+         (json/generate-string body)
+         "\n")))
 
 (defn generate-batches [batch-size docs]
   (->> (map generate-batch-style-doc docs)
        (partition batch-size batch-size nil)
        (map (fn [batched-docs]
-              (str (clojure.string/join "\n" batched-docs)
-                   "\n")))
-       ))
+              (clojure.string/join "" batched-docs)))))
 
 (defn index-batch [batch]
   (elasticsearch "_bulk"))
@@ -53,10 +52,9 @@
              ;; normal batches won't be nil
              ;; only get nil when channel is closed
              (do
-               (println (elasticsearch "_bulk" batch))
-               (println "Batch: ")
-               (println batch)
+               (elasticsearch "_bulk" batch)
                (recur))))))))
+
 (defn run-all []
   (run [{:id 1 :type "gene" :doc {:a 1 :b 2}} {:id 2 :type "gene" :doc {:a 1 :b 2}} {:id 4 :type "gene" :doc {:a 3333333}} {:id 5 :type "gene" :doc {:a 1 :b 2}}]))
 
