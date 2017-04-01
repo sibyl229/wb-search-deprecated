@@ -2,6 +2,7 @@
   (:require [clj-http.client :as http]
             [cheshire.core :as json]
             [clojure.core.async :as async :refer [go chan >! <! close!]]
+            [clojure.walk :as walk]
             [datomic.api :as d]
             [mount.core :as mount]
             [wb-es-indexer.db :refer [datomic-conn pull-spec]]))
@@ -21,6 +22,18 @@
                         :content-type :json
                         :body (json/encode body)}))))
 
+(defn format-field-name [field-name]
+  (let [string-field-name (if (keyword? field-name)
+                            (second (re-matches #":((.*\/)?.*)" (str field-name)))
+                            field-name)]
+    (clojure.string/replace string-field-name #"\." "\\$")))
+
+(defn fix-field-names
+  "Recursively convert all map keys to elasticsearch compatible field names"
+  [doc]
+  (let [f (fn [[k v]] [(format-field-name k) v])]
+    ;; only apply to maps
+    (walk/postwalk (fn [x] (if (map? x) (into {} (map f x)) x)) doc)))
 (defn- generate-batch-style-doc [doc]
   (let [action {:index {:_id (:id doc)
                         :_type (:type doc)}}
@@ -55,8 +68,28 @@
                (elasticsearch "_bulk" batch)
                (recur))))))))
 
+(defn get-docs-by-type
+  ([db type]
+   (get-docs-by-type db type (pull-spec db type)))
+  ([db type pull-spec]
+   (->> (d/q '[:find [?e ...]
+               :in $ ?ident
+               :where
+               [?e ?ident]]
+             db (keyword type "id"))
+        (map (fn [entity-id]
+               (assoc {}
+                      :id entity-id
+                      :type type
+                      :doc (fix-field-names (d/pull db pull-spec entity-id))))))))
+
 (defn run-all []
-  (run [{:id 1 :type "gene" :doc {:a 1 :b 2}} {:id 2 :type "gene" :doc {:a 1 :b 2}} {:id 4 :type "gene" :doc {:a 3333333}} {:id 5 :type "gene" :doc {:a 1 :b 2}}]))
+  (do
+
+    (run (take 2 (get-docs-by-type db "gene"
+                                   (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/other-sequence]))))
+    (run (lazy-seq '({:id 1 :type "gene" :doc {:a 1 :b 2}} {:id 2 :type "gene" :doc {"a$b" 1 :b 2}} {:id 4 :type "gene" :doc {:a 3333333}} {:id 5 :type "gene" :doc {:a 1 :b 2}}))))
+  )
 
 (defn -main
   "I don't do a whole lot ... yet."
