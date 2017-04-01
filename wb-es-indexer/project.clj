@@ -4,13 +4,16 @@
   :min-lein-version "2.7.0"
   :sign-releases false
   :dependencies
-  [[environ "1.1.0"]
+  [[cheshire "5.7.0"]
+   [clj-http "2.3.0"]
+   [org.clojure/core.async "0.3.442"]
+   [environ "1.1.0"]
    [mount "0.1.11"]
    [org.clojure/clojure "1.8.0"]]
   :source-paths ["src"]
   :plugins [[lein-environ "1.1.0"]
             [lein-pprint "1.1.1"]]
-  :main ^:skip-aot wb-es-indexer.db
+  :main ^:skip-aot wb-es-indexer.core
   :resource-paths ["resources"]
   :uberjar {:aot :all}
   :target-path "target/%s"
