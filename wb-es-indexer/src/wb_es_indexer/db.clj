@@ -50,6 +50,7 @@
     "gene"
     "gene-class"
     "go-term"
+    "interaction"
     "laboratory"
     "life-stage"
     "molecule"
@@ -147,7 +148,7 @@
                                   [parent-ident]}]}]
           []))
       (let [other-ident (keyword (namespace attr) "id")]
-        (if (core-type-names other-ident)
+        (if (core-type-names (namespace other-ident))
           [{(reverse-attr attr) [other-ident]}]
           [])))))
 ;;
