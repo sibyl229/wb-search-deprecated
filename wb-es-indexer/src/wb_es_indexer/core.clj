@@ -44,17 +44,17 @@
          (json/generate-string body)
          "\n")))
 
-;; (defn- create-batch [dbids doc-factory]
-;;   (->> (map doc-factory dbids)
-;;        (map generate-batch-style-doc)
-;;        (clojure.string/join "")))
-
-(defn create-batch [db pull-spec batch-dbids]
-  (->> batch-dbids
-       (d/pull-many db pull-spec)
-       (map format-doc)
+(defn- create-batch [dbids doc-factory]
+  (->> (doc-factory dbids)
        (map generate-batch-style-doc)
        (clojure.string/join "")))
+
+;; (defn create-batch [db pull-spec batch-dbids]
+;;   (->> batch-dbids
+;;        (d/pull-many db pull-spec)
+;;        (map format-doc)
+;;        (map generate-batch-style-doc)
+;;        (clojure.string/join "")))
 
 (defn generate-batches [batch-size doc-dbids]
   (->> (partition batch-size batch-size nil doc-dbids)
@@ -68,15 +68,14 @@
    :doc (fix-field-names doc)})
 
 (defn run
-  ([doc-dbids] (run doc-dbids (pull-spec (d/db datomic-conn) type) 10))
-  ([doc-dbids pull-pattern] (run doc-dbids pull-pattern 10))
-  ([doc-dbids pull-pattern buffer-size]
+  ([doc-dbids doc-factory] (run doc-dbids doc-factory 10))
+  ([doc-dbids doc-factory buffer-size]
    (let [doc-batches (generate-batches 10 doc-dbids)
          buffer (chan buffer-size)
          db (d/db datomic-conn)]
      (go (doseq [batch-dbids doc-batches]
-           ;;(>! buffer (create-batch batch-dbids doc-factory))
-           (>! buffer (create-batch db pull-pattern batch-dbids))
+           (>! buffer (create-batch batch-dbids doc-factory))
+           ;;(>! buffer (create-batch db pull-pattern batch-dbids))
            (println "push")
            )
          (println "done reading")
@@ -109,8 +108,13 @@
   (let [db (d/db datomic-conn)]
     (do
       (run
-        (take 100 (drop 30000 (get-docs-by-type db "gene")))
-        (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/paralog :gene/other-sequence])))))
+        (take 100 (drop 30100 (get-docs-by-type db "gene")))
+        (fn [dbids]
+          (->> (d/pull-many db (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/paralog :gene/other-sequence])
+                            dbids)
+               (map #(assoc {}
+                            :type "gene"
+                            :doc %))))))))
 
 (defn -main
   "I don't do a whole lot ... yet."
