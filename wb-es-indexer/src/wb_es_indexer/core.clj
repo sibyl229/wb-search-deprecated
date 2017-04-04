@@ -108,9 +108,9 @@
   (let [db (d/db datomic-conn)]
     (do
       (run
-        (take 100 (drop 30100 (get-docs-by-type db "gene")))
+        (take 100 (drop 31900 (get-docs-by-type db "gene")))
         (fn [dbids]
-          (->> (d/pull-many db (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/paralog :gene/other-sequence])
+          (->> (d/pull-many db (pull-spec db "gene")
                             dbids)
                (map #(assoc {}
                             :type "gene"

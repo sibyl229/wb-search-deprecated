@@ -129,13 +129,15 @@
     (if (= :db.type/ref attr-type)
       (if-let [ref-ident (:pace/obj-ref attr-entity)]
         ;; object (non-component) ref
-        [{attr [ref-ident]}]
+        ;;[{attr [ref-ident]}]
+        [attr]
         (if-let [c-attrs (component-attrs db attr)]
           ;; component ref
-          [{attr (->> c-attrs
-                      (map #(forward-pull-spec db %))
-                      (reduce concat [])
-                      (apply vector))}]
+          ;; [{attr (->> c-attrs
+          ;;             (map #(forward-pull-spec db %))
+          ;;             (reduce concat [])
+          ;;             (apply vector))}]
+          [attr]
           []))
       [attr])))
 
@@ -144,12 +146,14 @@
     (if-let [parent-attr (component-attr-of db attr)]
       (let [parent-ident (keyword (namespace parent-attr) "id")]
         (if (core-type-names (namespace parent-ident))
-          [{(reverse-attr attr) [{(reverse-attr parent-attr)
-                                  [parent-ident]}]}]
+          ;; [{(reverse-attr attr) [{(reverse-attr parent-attr)
+          ;;                         [parent-ident]}]}]
+          [{(reverse-attr attr) [(reverse-attr parent-attr)]}]
           []))
       (let [other-ident (keyword (namespace attr) "id")]
         (if (core-type-names (namespace other-ident))
-          [{(reverse-attr attr) [other-ident]}]
+          ;;  [{(reverse-attr attr) [other-ident]}]
+          [(reverse-attr attr)]
           [])))))
 ;;
 ;; end of pull spec parts
@@ -194,7 +198,8 @@
                       (->> (reduce (fn [accumulator attr]
                                      (concat accumulator (reverse-pull-spec db attr)))
                                    []
-                                   reverse-attrs)))))))
+                                   reverse-attrs))
+                      )))))
 
 ;; example
 ;; (d/pull db (pull-spec db "gene" [:gene/rnaseq :gene/ortholog :gene/other-sequence]) [:gene/id "WBGene00015146"])
