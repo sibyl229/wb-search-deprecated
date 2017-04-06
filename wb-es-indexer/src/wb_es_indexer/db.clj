@@ -133,11 +133,11 @@
         [attr]
         (if-let [c-attrs (component-attrs db attr)]
           ;; component ref
-          ;; [{attr (->> c-attrs
-          ;;             (map #(forward-pull-spec db %))
-          ;;             (reduce concat [])
-          ;;             (apply vector))}]
-          [attr]
+          [{attr (->> c-attrs
+                      (map #(forward-pull-spec db %))
+                      (reduce concat [])
+                      (apply vector))}]
+          ;;[attr]
           []))
       [attr])))
 
