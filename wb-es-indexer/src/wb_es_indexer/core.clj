@@ -1,7 +1,7 @@
 (ns wb-es-indexer.core
   (:require [clj-http.client :as http]
             [cheshire.core :as json]
-            [clojure.core.async :as async :refer [go chan >! <! close!]]
+            [clojure.core.async :as async :refer [go chan >! <! >!! <!! close!]]
             [clojure.walk :as walk]
             [datomic.api :as d]
             [mount.core :as mount]
@@ -70,25 +70,26 @@
 (defn run
   ([doc-dbids doc-factory] (run doc-dbids doc-factory 10))
   ([doc-dbids doc-factory buffer-size]
-   (let [doc-batches (generate-batches 10 doc-dbids)
+   (let [doc-batches (generate-batches 100 doc-dbids)
          buffer (chan buffer-size)
          db (d/db datomic-conn)]
-     (go (doseq [batch-dbids doc-batches]
-           (>! buffer (create-batch batch-dbids doc-factory))
-           ;;(>! buffer (create-batch db pull-pattern batch-dbids))
-           (println "push")
-           )
-         (println "done reading")
-         (close! buffer))
-     (go (loop []
-           (if-let [batch (<! buffer)]
-             ;; normal batches won't be nil
-             ;; only get nil when channel is closed
-             (do
-               (println "pop")
-               (elasticsearch "_bulk" batch)
-               (recur))
-             ))))))
+     (go
+       (doseq [batch-dbids doc-batches]
+         (>! buffer (create-batch batch-dbids doc-factory))
+         ;;(>! buffer (create-batch db pull-pattern batch-dbids))
+         (println "push")
+         )
+       (println "done reading")
+       (close! buffer))
+     (loop []
+       (if-let [batch (<!! buffer)]
+         ;; normal batches won't be nil
+         ;; only get nil when channel is closed
+         (do
+           (println "pop")
+           (time (elasticsearch "_bulk" batch))
+           (recur))
+         )))))
 
 (defn get-docs-by-type
   ([db type]
@@ -107,14 +108,14 @@
 (defn run-all []
   (let [db (d/db datomic-conn)]
     (do
-      (run
-        (take 100 (drop 31900 (get-docs-by-type db "gene")))
+      (time (run
+        (take 200 (drop 1400 (get-docs-by-type db "gene")))
         (fn [dbids]
           (->> (d/pull-many db (pull-spec db "gene")
                             dbids)
                (map #(assoc {}
                             :type "gene"
-                            :doc %))))))))
+                            :doc (fix-field-names %))))))))))
 
 (defn -main
   "I don't do a whole lot ... yet."

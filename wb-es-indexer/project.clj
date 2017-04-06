@@ -58,4 +58,4 @@
            [com.jakemccrary/lein-test-refresh "0.17.0"]]}]
       :test
       {:resource-paths ["test/resources"]}}
-  :repl-options {:init (set! *print-length* 10)})
+  :repl-options {:init (set! *print-length* 100)})
