@@ -38,7 +38,7 @@
                           (get options :from 0))
                   {:content-type "application/json"
                    :body (json/generate-string query)})]
-    (json/parse-string (:body response))))
+    (json/parse-string (:body response) true)))
 
 
 (defn autocomplete [q options]
@@ -50,12 +50,13 @@
                                    {:match {:wbid_as_label q}}]}}]}}}
 
         response
-        (http/get (format "%s/%s/_search"
+        (http/get (format "%s/%s/_search?size=%s"
                           es-base-url
-                          release-id)
+                          release-id
+                          (get options :size 10))
                   {:content-type "application/json"
                    :body (json/generate-string query)})]
-    (json/parse-string (:body response))))
+    (json/parse-string (:body response) true)))
 
 
 (defn search-exact [q options]
@@ -72,7 +73,7 @@
                           release-id)
                   {:content-type "application/json"
                    :body (json/generate-string query)})]
-    (json/parse-string (:body response))))
+    (json/parse-string (:body response) true)))
 
 
 (defn random [options]
@@ -89,7 +90,7 @@
                           release-id)
                   {:content-type "application/json"
                    :body (json/generate-string query)})]
-    (json/parse-string (:body response))))
+    (json/parse-string (:body response) true)))
 
 
 (defn count [q options]
@@ -110,4 +111,4 @@
                           release-id)
                   {:content-type "application/json"
                    :body (json/generate-string query)})]
-    (json/parse-string (:body response))))
+    (json/parse-string (:body response) true)))

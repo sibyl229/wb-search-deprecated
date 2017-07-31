@@ -4,19 +4,58 @@
             [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
             [ring.middleware.json :refer [wrap-json-response]]
             [ring.util.response :refer [response not-found]]
-            [wb-es.web.core :as web-core]))
+            [wb-es.web.core :as web-core]
+            [wb-es.web.integration :as web-integration]))
+(def search-route
+  (GET "/search" [q & options]
+       (response (web-core/search q options))))
+
+(def autocomplete-route
+  (GET "/autocomplete" [q & options]
+       (response (web-core/autocomplete q options))))
+
+(def search-exact-route
+  (GET "/search-exact" [q & options]
+       (response (web-core/search-exact q options))))
+
+(def count-route
+  (GET "/count" [q & options]
+       (response (web-core/count q options))))
+
+(def random-route
+  (GET "/random" [q & options]
+       (response (web-core/random options))))
+
+(defroutes api-lite-routes
+  search-route
+  autocomplete-route
+  search-exact-route
+  count-route
+  random-route)
+
+(defroutes integration-routes
+  (-> search-route
+      (wrap-routes web-integration/wrap-params)
+      (wrap-routes web-integration/wrap-search))
+  (-> autocomplete-route
+      (wrap-routes web-integration/wrap-params)
+      (wrap-routes web-integration/wrap-autocomplete))
+  (-> search-exact-route
+      (wrap-routes web-integration/wrap-params)
+      (wrap-routes web-integration/wrap-search-exact))
+  (-> count-route
+      (wrap-routes web-integration/wrap-params)
+      (wrap-routes web-integration/wrap-count))
+  (-> random-route
+      (wrap-routes web-integration/wrap-params)
+      (wrap-routes web-integration/wrap-random)))
 
 (defroutes app
-  (GET "/search" [q & options]
-       (response (web-core/search q options)))
-  (GET "/autocomplete" [q & options]
-       (response (web-core/autocomplete q options)))
-  (GET "/search-exact" [q & options]
-       (response (web-core/search-exact q options)))
-  (GET "/count" [q & options]
-       (response (web-core/count q options)))
-  (GET "/random" [q & options]
-       (response (web-core/random options)))
+  api-lite-routes
+  (context "/integration" []
+           integration-routes
+           (context "/lite" []
+                    (wrap-routes api-lite-routes web-integration/wrap-params)))
   (route/not-found (response {:message "endpoint not found"})))
 
 (defn handler [request]
