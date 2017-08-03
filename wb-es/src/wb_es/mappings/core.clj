@@ -1,9 +1,16 @@
 (ns wb-es.mappings.core)
 
+(defn ref-mapping []
+  {:type "nested"
+   :properties {:wbid {:type "string"
+                       :analyzer "keyword_ignore_case"}
+                :label {:type "string"}
+                :ref_type {:type "string"}}})
+
 (def default-mapping
   {:properties
    {:wbid {:type "string"
-           :analyzer "keyword_ignore_case"
+           :analyzer "keyword"
            :include_in_all false}
 
     :label {:type "string"
@@ -12,16 +19,33 @@
                            :analyzer "keyword_ignore_case"}
                      :autocomplete {:type "string"
                                     :analyzer "autocomplete"
-                                    :search_analyzer "standard"}}
+                                    :search_analyzer "standard"}
+
+                     ;; autocomplete analyzer will handle gene name like unc-22 as phase search,
+                     ;; seeems sufficient for now, no need for autocomplete_keyword analyzer
+                     ;; :autocomplete_keyword {:type "string"
+                     ;;                        :analyzer "autocomplete_keyword"
+                     ;;                        :search_analyzer "keyword_ignore_case"}
+                     }
             }
     :other_names {:type "string"
                   :analyzer "keyword_ignore_case"}
     :paper_type {:type "string"
                  :analyzer "keyword_ignore_case"}
-    :species {:type "string"
-              :analyzer "keyword_ignore_case"}
-    :gene {:type "string"
-           :analyzer "keyword_ignore_case"}}})
+    :species {:properties
+              {:key {:type "string"
+                     :analyzer "keyword_ignore_case"}
+               :name {:type "string"}}}
+
+    :genotype {:type "string"}
+
+    ;; start of refs
+    :author (ref-mapping)
+    :gene (ref-mapping)
+    :phenotype (ref-mapping)
+    :strain (ref-mapping)
+    ;; end of refs
+    }})
 
 (def index-settings
   {:settings
@@ -32,6 +56,9 @@
                :analyzer {"autocomplete" {:type "custom"
                                           :tokenizer "standard"
                                           :filter ["lowercase" "autocomplete_filter"]}
+                          "autocomplete_keyword" {:type "custom"
+                                                  :tokenizer "keyword"
+                                                  :filter ["lowercase" "autocomplete_filter"]}
                           "keyword_ignore_case" {:type "custom"
                                                  :tokenizer "keyword"
                                                  :filter ["lowercase"]}}}}

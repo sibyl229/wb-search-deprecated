@@ -7,20 +7,28 @@
   (->> []
        (cons (when-let [type-value (:type options)]
                {:type {:value (clojure.string/replace type-value #"_" "-")}}))
-       (cons (when-let [species-value (:species options)]
-               {:term {:species species-value}}))
+       (cons (when-let [species-value (some->> (:species options)
+                                               (clojure.string/lower-case))]
+               {:term {:species.key species-value}}))
+       (cons (when-let [species-value (some->> (:paper_type options)
+                                               (clojure.string/lower-case))]
+               {:term {:paper_type species-value}}))
        (filter identity)))
 
 
 (defn search [q options]
   (let [query (if (and q (not= (clojure.string/trim q) ""))
-                {:query
+                {;:explain true
+                 :query
                  {:bool
                   {:must [{:bool {:filter (get-filter options)}}
                           {:dis_max
                            {:queries [{:term {:wbid q}}
-                                      {:match {:label q}}
-                                      {:match {:_all {:query q :boost 0.1}}}]
+                                      {:match_phrase {:label {:query q
+                                                              :minimum_should_match "70%"}}}
+                                      {:match_phrase {:_all {:query q
+                                                             :minimum_should_match "70%"
+                                                             :boost 0.1}}}]
                             :tie_breaker 0.3}}]}}
                  :highlight
                  {:fields {:wbid {}
@@ -100,8 +108,11 @@
                   {:must [{:bool {:filter (get-filter options)}}
                           {:dis_max
                            {:queries [{:term {:wbid q}}
-                                      {:match {:label q}}
-                                      {:match {:_all {:query q :boost 0.1}}}]
+                                      {:match_phrase {:label {:query q
+                                                              :minimum_should_match "70%"}}}
+                                      {:match_phrase {:_all {:query q
+                                                             :minimum_should_match "70%"
+                                                             :boost 0.1}}}]
                             :tie_breaker 0.3}}]}}}
                 {:query {:bool {:filter (get-filter options)}}})
 
