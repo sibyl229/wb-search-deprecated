@@ -30,6 +30,9 @@
                            {:queries [{:term {:wbid q}}
                                       {:match_phrase {:label {:query q
                                                               :minimum_should_match "70%"}}}
+                                      {:match_phrase {:other_names {:query q
+                                                                    :minimum_should_match "70%"
+                                                                    :boost 0.9}}}
                                       {:match_phrase {:_all {:query q
                                                              :minimum_should_match "70%"
                                                              :boost 0.1}}}]
@@ -117,6 +120,9 @@
                            {:queries [{:term {:wbid q}}
                                       {:match_phrase {:label {:query q
                                                               :minimum_should_match "70%"}}}
+                                      {:match_phrase {:other_names {:query q
+                                                                    :minimum_should_match "70%"
+                                                                    :boost 0.9}}}
                                       {:match_phrase {:_all {:query q
                                                              :minimum_should_match "70%"
                                                              :boost 0.1}}}]
