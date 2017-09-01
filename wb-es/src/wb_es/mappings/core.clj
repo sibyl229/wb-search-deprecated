@@ -7,7 +7,7 @@
                 :label {:type "string"}
                 :ref_type {:type "string"}}})
 
-(def default-mapping
+(def generic-mapping
   {:properties
    {:wbid {:type "string"
            :analyzer "keyword"
@@ -34,6 +34,8 @@
     :other_names {:type "string"
                   :include_in_all false
                   :analyzer "keyword_ignore_case"}
+    :page_type {:type "string"
+                :analyzer "keyword_ignore_case"}
     :paper_type {:type "string"
                  :analyzer "keyword_ignore_case"}
     :species {:properties
@@ -66,4 +68,4 @@
                           "keyword_ignore_case" {:type "custom"
                                                  :tokenizer "keyword"
                                                  :filter ["lowercase"]}}}}
-   :mappings {:_default_ default-mapping}})
+   :mappings {:generic generic-mapping}})

@@ -93,7 +93,7 @@
                                :hits
                                (first))]
             (is (= "W02C12" (get-in first-hit [:_source :wbid])))
-            (is (= "clone" (get-in first-hit [:_type])))))
+            (is (= "clone" (get-in first-hit [:_source :page_type])))))
         (testing "autocomplete by clone WBID"
           (let [hits (->> (autocomplete "W02C")
                           :hits
@@ -149,7 +149,13 @@
           (is (some (fn [hit]
                       (= "Parkinson's disease"
                          (get-in hit [:_source :label])))
-                    hits)))))
+                    hits))))
+
+      (testing "search with page_type do_term"
+        (apply index-datomic-entity disease-parks)
+        (let [hits (search nil {:type "disease"})]
+          (is (= "disease"
+                 (get-in hits [:hits :hits 0 :_source :page_type]))))))
     ))
 
 (deftest go-term-type-test
@@ -224,3 +230,13 @@
                            (get-in hit [:_source :label])))
                       hits)))))
       )))
+
+(deftest pcr-product-type-test
+  (testing "pcr-product is searchable by page_type pcr_oligo"
+    (let [db (d/db datomic-conn)]
+      (do
+        (index-datomic-entity (d/entity db [:pcr-product/id "sjj_ZK822.2"]))
+        (let [hit (-> (search "sjj_ZK822.2" {:type "pcr_oligo"})
+                      (get-in [:hits :hits 0 :_source]))]
+          (= "sjj_ZK822.2" (:wbid hit))
+          (= "pcr_oligo" (:page_type hit)))))))
