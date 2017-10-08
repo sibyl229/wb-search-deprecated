@@ -6,6 +6,8 @@
             [datomic.api :as d]
             [mount.core :as mount]
             [wb-es.datomic.data.core :refer [create-document]]
+            [wb-es.datomic.data.gene :as gene]
+            [wb-es.datomic.data.variation :as variation]
             [wb-es.datomic.db :refer [datomic-conn]]
             [wb-es.env :refer [es-base-url release-id]]
             [wb-es.mappings.core :refer [index-settings]]))
@@ -13,25 +15,47 @@
 (defn format-bulk
   "returns a new line delimited JSON based on
   an action name and a list of Documents (acoording to Document protocol)"
-  ([action-name documents] (format-bulk action-name nil documents))
-  ([action-name index documents]
+  ([action documents] (format-bulk action nil documents))
+  ([action index documents]
    (->> documents
         (map (fn [doc]
-               (if-not (= (name action-name) "delete")
-                 (format "%s\n%s"
-                         (json/generate-string {action-name (if index
-                                                              (assoc (meta doc) :_index index) ; ie to specify test index
-                                                              (meta doc))})
-                         (json/generate-string doc)))))
+               (let [action-data {action (if index
+                                           (assoc (meta doc) :_index index) ; ie to specify test index
+                                           (meta doc))}
+                     action-name (name action)]
+                 (cond
+                   (or (= action-name "index")
+                       (= action-name "create"))
+                   (format "%s\n%s"
+                           (json/generate-string action-data)
+                           (json/generate-string doc))
+
+                   (= action-name "update")
+                   (if (:script doc)
+                     (format "%s\n%s"
+                             (json/generate-string action-data)
+                             (json/generate-string doc))
+                     (format "%s\n%s"
+                             (json/generate-string action-data)
+                             (json/generate-string {:doc doc
+                                                    :doc_as_upsert true})
+                             ))
+
+                   (= action-name "delete")
+                   (json/parse-string action-data))
+                 )))
         (clojure.string/join "\n")
         (format "%s\n")))) ;trailing \n is necessary for Elasticsearch to parse the request
 
 (defn submit
   "submit formatted new line delimited JSON to elasticsearch"
-  [formatted-docs & {:keys [refresh]}]
-  (http/post (format "%s/_bulk?refresh=%s" es-base-url (or refresh "false"))
-             {:headers {:content-type "application/x-ndjson"}
-              :body formatted-docs}))
+  [formatted-docs & {:keys [refresh index]}]
+  (let [url-prefix (if index
+                     (format "%s/%s" es-base-url index)
+                     es-base-url)]
+    (http/post (format "%s/_bulk?refresh=%s" url-prefix (or refresh "false"))
+               {:headers {:content-type "application/x-ndjson"}
+                :body formatted-docs})))
 
 (defn get-eids-by-type
   "get all datomic entity ids of a given type
@@ -47,27 +71,40 @@
   "turn a list datomic entity ids to batches of the given size.
   attach some metadata for debugging"
   ([eids] (make-batches 500 nil eids))
-  ([batch-size order-info eids]
+  ([batch-size order-info eids] (make-batches batch-size order-info "index" eids))
+  ([batch-size order-info action eids]
    (->> eids
-        (sort)
+        (sort-by (fn [param]
+                   (if (sequential? param)
+                     (first param)
+                     (identity param))))
         (partition batch-size batch-size [])
         (map (fn [batch]
                (with-meta batch {:order order-info
+                                 :action action
                                  :size (count batch)
                                  :start (first batch)
                                  :end (last batch)}))))))
 
 (defn run-index-batch
   "index data of a batch of datomic entity ids"
-  [db batch]
+  [db index batch]
   (->> batch
-       (map #(create-document (d/entity db %)))
-       (format-bulk "index")
-       (submit)))
+       (map (fn [param]
+              (if (sequential? param)
+                (let [[eid & other-params] param]
+                  (apply create-document (d/entity db eid) other-params))
+                (create-document (d/entity db param)))))
+       (format-bulk (:action (meta batch)))
+       ((fn [formatted-bulk]
+          (submit formatted-bulk :index index)))
+       )
+  )
 
-(defn run []
-  (let [db (d/db datomic-conn)
-        index-url (format "%s/%s " es-base-url release-id)]
+
+(defn run [& {:keys [db]
+              :or {db (d/db datomic-conn)}}]
+  (let [index-url (format "%s/%s " es-base-url release-id)]
     (do
       (http/put index-url {:headers {:content-type "application/json"}
                            :body (json/generate-string index-settings)})
@@ -96,7 +133,7 @@
                 ;; only get nil when channel is closed
                 (do
                   (>! logger (or (meta job) :no_metadata))
-                  (run-index-batch db job)
+                  (run-index-batch db release-id job)
                   (recur))
                 (close! logger)))))
 
@@ -271,6 +308,26 @@
                 jobs (make-batches 1000 :variation eids)]
             (doseq [job jobs]
               (>!! scheduler job)))
+
+          ;; get index gene by variation
+          (let [v-g (d/q '[:find ?v ?g
+                           :where
+                           [?v :variation/allele true]
+                           [?v :variation/gene ?gh]
+                           [?gh :variation.gene/gene ?g]]
+                         db)]
+            (let [jobs (->> (map (fn [[v g]]
+                                   [v gene/->Variation g]) v-g)
+                            (make-batches 1000 :gene->variation "update"))]
+              (doseq [job jobs]
+                (>!! scheduler job)))
+            (let [jobs (->> (map (fn [[v g]]
+                                   [g variation/->Gene v]) v-g)
+                            (make-batches 1000 :variation->gene "update"))]
+              (doseq [job jobs]
+                (>!! scheduler job)))
+            )
+
 
           ;; close the channel to indicate no more input
           ;; existing jobs on the channel will remain available for consumers

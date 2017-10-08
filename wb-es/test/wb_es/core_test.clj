@@ -25,7 +25,8 @@
             (prn "failed to delete index.")
             (prn e)))
         (http/put index-url {:headers {:content-type "application/json"}
-                             :body (json/generate-string mappings/index-settings)})
+                             :body (->> (assoc-in mappings/index-settings [:settings :number_of_shards] 1)
+                                        (json/generate-string))})
         (mount/start)
         (f)
         (mount/stop))
@@ -34,7 +35,7 @@
 (use-fixtures :once wrap-setup)
 
 (defn index-doc [& docs]
-  (let [formatted-docs (bulk/format-bulk "index" "test" docs)]
+  (let [formatted-docs (bulk/format-bulk "update" "test" docs)]
     (bulk/submit formatted-docs :refresh true)))
 
 (defn index-datomic-entity [& entities]

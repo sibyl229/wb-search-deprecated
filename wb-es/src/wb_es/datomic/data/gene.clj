@@ -33,3 +33,13 @@
                       (filter identity)
                       (first)
                       (data-util/pack-obj))}))
+
+(deftype Variation [variation]
+  data-util/Document
+  (metadata [this] (data-util/default-metadata variation))
+  (data [this]
+    (let [packed-variation (data-util/pack-obj variation)]
+      {:script
+       {:inline "ctx._source.allele = ctx._source.containsKey(\"allele\") ? + ctx._source.allele + allele : [allele]"
+        :params {:allele packed-variation}}
+       :upsert {:allele [packed-variation]}})))

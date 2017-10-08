@@ -2,10 +2,10 @@
 
 (defn ref-mapping []
   {:type "nested"
-   :properties {:wbid {:type "string"
-                       :analyzer "keyword_ignore_case"}
+   :properties {:id {:type "string"
+                     :analyzer "keyword"}
                 :label {:type "string"}
-                :ref_type {:type "string"}}})
+                :class {:type "string"}}})
 
 (def generic-mapping
   {:properties
@@ -46,6 +46,7 @@
     :genotype {:type "string"}
 
     ;; start of refs
+    :allele (ref-mapping)
     :author (ref-mapping)
     :gene (ref-mapping)
     :phenotype (ref-mapping)
@@ -55,8 +56,7 @@
 
 (def index-settings
   {:settings
-   {:number_of_shards 1
-    :analysis {:filter {"autocomplete_filter" {:type "edge_ngram"
+   {:analysis {:filter {"autocomplete_filter" {:type "edge_ngram"
                                                :min_gram 2
                                                :max_gram 20}}
                :analyzer {"autocomplete" {:type "custom"

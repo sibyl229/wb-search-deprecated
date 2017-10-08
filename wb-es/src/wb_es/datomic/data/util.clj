@@ -22,12 +22,8 @@
 (defn default-metadata
   "default implementation of the data method of Document protocol"
   [entity]
-  (let [ident (get-ident-attr entity)]
-    (if ident
-      {:_index release-id
-       :_type "generic"
-       :_id (format "%s:%s" type (ident entity))}
-      (throw (Exception. "cannot identify ident attribute of the entity")))))
+  {:_type "generic"
+   :_id (:db/id entity)})
 
 (defn format-enum
   "format the datomic enum into a elasticsearch term"
@@ -66,8 +62,9 @@
   ([species-entity bioproject-id]
    (if species-entity
      (if bioproject-id
-         (format "%s (%s)" (:species/id species-entity) (bioprojec-to-strain (d/entity-db species-entity) bioproject-id))
-         (:species/id species-entity)))))
+       ;; (format "%s (%s)" (:species/id species-entity) (bioprojec-to-strain (d/entity-db species-entity) bioproject-id)) ;; broken in ws259
+       (format "%s (%s)" (:species/id species-entity) bioproject-id) ;; temp fix for ws259
+       (:species/id species-entity)))))
 
 (def format-species-text-memoized (memoize format-species-text))
 

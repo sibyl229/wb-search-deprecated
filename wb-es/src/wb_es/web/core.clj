@@ -23,6 +23,8 @@
 (defn search [es-base-url index q options]
   (let [query (if (and q (not= (clojure.string/trim q) ""))
                 {;:explain true
+                 :sort [:_score
+                        {:label {:order :asc}}]
                  :query
                  {:bool
                   {:must [{:bool {:filter (get-filter options)}}
